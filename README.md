@@ -1,5 +1,7 @@
 # BlossomiShymae.Smolder
 
+[![NuGet Stable](https://img.shields.io/nuget/v/BlossomiShymae.Smolder.svg?style=flat-square&logo=nuget&logoColor=black&labelColor=69ffbe&color=77077a)](https://www.nuget.org/packages/BlossomiShymae.Smolder/) [![NuGet Downloads](https://img.shields.io/nuget/dt/BlossomiShymae.Smolder?style=flat-square&logoColor=black&labelColor=69ffbe&color=77077a)](https://www.nuget.org/packages/BlossomiShymae.Smolder/)
+
 `BlossomiShymae.Smolder` is a NuGet package for interfacing with CommunityDragon. Current features include:
 - Directory downloading files
 - Regex search files
