@@ -11,4 +11,4 @@ var client = new Client() { Logger = LoggerFactory.Create(builder =>
     });
 }).CreateLogger<Client>() };
 
-await client.DownloadDirectoryAsync("https://universe.communitydragon.org/events/2024/mgs-crepe/assets/");
+await client.DownloadDirectoryAsync("https://raw.communitydragon.org/latest/game/data/images/");

@@ -11,7 +11,7 @@ namespace BlossomiShymae.Smolder.Benchmarks;
 public class DownloadDirectoryJson
 {
     private static HttpClient _httpClient = default!;
-    private static readonly string _directory = "https://raw.communitydragon.org/latest/game/data/images/";
+    private static readonly string _directory = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/loadouts/summonerbanners/";
 
     [GlobalSetup]
     public void GlobalSetup()
@@ -33,7 +33,7 @@ public class DownloadDirectoryJson
 public class DownloadDirectoryExported
 {
     private static HttpClient _httpClient = default!;
-    private static readonly string _directory = "https://raw.communitydragon.org/latest/game/data/images/";
+    private static readonly string _directory = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/loadouts/summonerbanners/";
     public static List<ExportedFile> _exportedFiles = [];
 
     [GlobalSetup]

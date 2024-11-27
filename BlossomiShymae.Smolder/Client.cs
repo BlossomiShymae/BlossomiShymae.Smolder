@@ -87,20 +87,27 @@ public class Client
     {
         DeleteDirectory();
 
-        var directories = new ConcurrentStack<string>();
-        var pointerUrl = url.Replace(".org", ".org/json");
-        var _url = pointerUrl;
+        var _url = url.Replace(".org", ".org/json");
         Logger.LogInformation("Downloading directory: {Url}", _url);
 
         var tasks = new ConcurrentBag<Task>();
+        var directories = new ConcurrentBag<string> { _url };
         do
         {
-            Logger.LogDebug("Getting json files: {Url}", Uri.UnescapeDataString(pointerUrl));
-            var files = await GetJsonFilesAsync(pointerUrl, cancellationToken)
-                .ConfigureAwait(false);
+            var files = new ConcurrentBag<JsonFile>();
 
-            if (files.Count == 0)
-                break;
+            await Parallel.ForEachAsync(directories, cancellationToken, async (directory, cancellationToken) =>
+            {
+                Logger.LogDebug("Getting json files: {Url}", Uri.UnescapeDataString(directory));
+                var rawFiles = await GetJsonFilesAsync(directory, cancellationToken)
+                    .ConfigureAwait(false);
+                foreach (var rawFile in rawFiles)
+                {
+                    files.Add(rawFile);
+                }
+            }).ConfigureAwait(false);
+
+            directories.Clear();
 
             Parallel.ForEach(files, file =>
             {
@@ -108,7 +115,7 @@ public class Client
                 {
                     if (MaxDepth > 0)
                     {
-                        var pathDifference = Path.Join(pointerUrl, file.Raw.EncodedName)
+                        var pathDifference = Path.Join(file.Referrer, file.Raw.EncodedName)
                             .Replace(_url, string.Empty);
                         var depth = pathDifference.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
                         if (depth >= MaxDepth)
@@ -118,8 +125,8 @@ public class Client
                         }
                     }
 
-                    Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, pointerUrl, file.Raw.Name));
-                    directories.Push(Path.Join(pointerUrl, file.Raw.EncodedName, "/"));
+                    Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, file.Raw.Name));
+                    directories.Add(Path.Join(file.Referrer, file.Raw.EncodedName, "/"));
                     return;
                 }
 
@@ -127,7 +134,7 @@ public class Client
             });
 
             Logger.LogDebug("Directories left: {Count}", directories.Count);
-        } while (directories.TryPop(out pointerUrl));
+        } while (!directories.IsEmpty);
 
         Logger.LogDebug("Finished adding files to queue");
 
