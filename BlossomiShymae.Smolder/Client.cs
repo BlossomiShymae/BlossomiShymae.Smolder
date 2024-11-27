@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using BlossomiShymae.Smolder.Files;
 using Microsoft.Extensions.Logging;
@@ -83,54 +85,54 @@ public class Client
     /// <returns></returns>
     public async Task DownloadDirectoryAsync(string url, CancellationToken cancellationToken = default)
     {
-        TryOverwriteFolder();
+        DeleteDirectory();
 
-        var directories = new Stack<string>();
+        var directories = new ConcurrentStack<string>();
         var pointerUrl = url.Replace(".org", ".org/json");
         var _url = pointerUrl;
         Logger.LogInformation("Downloading directory: {Url}", _url);
 
-        while (true)
+        var tasks = new ConcurrentBag<Task>();
+        do
         {
+            Logger.LogDebug("Getting json files: {Url}", Uri.UnescapeDataString(pointerUrl));
             var files = await GetJsonFilesAsync(pointerUrl, cancellationToken)
                 .ConfigureAwait(false);
 
             if (files.Count == 0)
                 break;
 
-            var tasks = new List<Task>();
-            foreach (var file in files)
+            Parallel.ForEach(files, file =>
             {
                 if (file.Raw.FileType == FileType.Directory)
                 {
                     if (MaxDepth > 0)
                     {
                         var pathDifference = Path.Join(pointerUrl, file.Raw.EncodedName)
-                        .Replace(_url, string.Empty);
+                            .Replace(_url, string.Empty);
                         var depth = pathDifference.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
                         if (depth >= MaxDepth)
                         {
-                            Logger.LogDebug("Skipping directory as it exceeds max depth: {Tuple}", (depth, MaxDepth, file.Raw.EncodedName));
-                            continue;
+                            Logger.LogDebug("Skipping directory as it exceeds max depth: {Tuple}", (depth, MaxDepth, file.Raw.Name));
+                            return;
                         }
                     }
 
-                    Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, pointerUrl, file.Raw.EncodedName));
+                    Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, pointerUrl, file.Raw.Name));
                     directories.Push(Path.Join(pointerUrl, file.Raw.EncodedName, "/"));
-                    continue;
+                    return;
                 }
 
                 tasks.Add(DownloadFileAsync(_url, file, cancellationToken));
-            }
+            });
 
-            await Task.WhenAll(tasks)
-                .ConfigureAwait(false);
+            Logger.LogDebug("Directories left: {Count}", directories.Count);
+        } while (directories.TryPop(out pointerUrl));
 
-            if (directories.Count == 0)
-                break;
+        Logger.LogDebug("Finished adding files to queue");
 
-            pointerUrl = directories.Pop();
-        }
+        await Task.WhenAll(tasks)
+            .ConfigureAwait(false);
 
         Logger.LogInformation("Finished directory: {Url}", _url);
     }
@@ -152,7 +154,7 @@ public class Client
     /// <returns></returns>
     public async Task DownloadDirectoryAsync(string url, List<ExportedFile> exportedFiles, CancellationToken cancellationToken = default)
     {
-        TryOverwriteFolder();
+        DeleteDirectory();
 
         Logger.LogInformation("Downloading directory: {Url}", url);
         var patchVersion = url.Replace("https://raw.communitydragon.org", string.Empty)
@@ -220,6 +222,7 @@ public class Client
         
         return System.Text.Encoding.UTF8.GetString(bytes)
             .Split('\n')
+            .AsParallel()
             .Select(line => new ExportedFile { Path = line, Version = patchVersion })
             .ToList();
     }
@@ -240,7 +243,7 @@ public class Client
         var rawFiles = await GetRawFilesAsync(url, cancellationToken)
             .ConfigureAwait(false);
 
-        return rawFiles.Select(f => new JsonFile()
+        return rawFiles.AsParallel().Select(f => new JsonFile()
         {
             Raw = f,
             Referrer = url
@@ -258,11 +261,20 @@ public class Client
     /// <param name="url">The CommunityDragon URL directory to download from.</param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<List<RawFile>> GetRawFilesAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<RawFile[]> GetRawFilesAsync(string url, CancellationToken cancellationToken = default)
     {
         ValidateUrl(url);
 
-        var rawFiles = await HttpClient.GetFromJsonAsync<List<RawFile>>(url, cancellationToken)
+        var res = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!res.IsSuccessStatusCode)
+            throw new HttpRequestException(null, null, res.StatusCode);
+
+        var contentStream = await res.Content.ReadAsStreamAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var rawFiles = await JsonSerializer.DeserializeAsync(contentStream, SourceGenerationContext.Default.RawFileArray, cancellationToken)
             .ConfigureAwait(false);
 
         return rawFiles ?? [];
@@ -287,15 +299,23 @@ public class Client
             .Select(f => f.Name)
             .ToList();
     }
-    private void TryOverwriteFolder()
+    private void DeleteDirectory()
     {
-        if (OverwriteFolder)
+        if (OverwriteFolder && Directory.Exists(OutputPath))
         {
             try
             {
                 Directory.Delete(OutputPath, true);
             }
-            catch (DirectoryNotFoundException) { }
+            catch (IOException ex)
+            {
+                Logger.LogWarning(ex, "Directory is likely being used");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to overwrite directory: {Path}", OutputPath);
+                throw;
+            }
         }
     }
 
@@ -328,15 +348,22 @@ public class Client
 
     private async Task DownloadFileAsync(string url, JsonFile file, CancellationToken cancellationToken)
     {
-        var _directories = file.Referrer.Replace(url, string.Empty)
+        string directoryPath = GetDirectoryPath(url, Uri.UnescapeDataString(file.Referrer));
+
+        Directory.CreateDirectory(directoryPath);
+
+        await DownloadAsync(file.Url, file.Raw.Name, directoryPath, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private string GetDirectoryPath(string url, string referrer)
+    {
+        var _directories = referrer.Replace(url, string.Empty)
             .Split("/", StringSplitOptions.RemoveEmptyEntries)
             .Prepend(OutputPath)
             .ToArray();
         var directoryPath = Path.Join(_directories);
-
-        Directory.CreateDirectory(directoryPath);
-
-        await DownloadAsync(file.Url, file.Raw.Name, directoryPath, cancellationToken).ConfigureAwait(false);
+        return directoryPath;
     }
 
     private async Task DownloadAsync(string fileUrl, string fileName, string directoryPath, CancellationToken cancellationToken)
@@ -352,7 +379,7 @@ public class Client
             Logger.LogDebug("File doesn't pass filter: {Tuple}", (fileName, Filter));
             return;
         }
-            
+
         for (int i = 0; i < Retries; i++)
         {
             try
@@ -361,7 +388,7 @@ public class Client
                     .ConfigureAwait(false);
 
                 Logger.LogInformation("Downloading file: {Url}", fileUrl);
-                var res = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, fileUrl), cancellationToken)
+                var res = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, fileUrl), HttpCompletionOption.ResponseContentRead, cancellationToken)
                 .ConfigureAwait(false);
 
                 if ((int)res.StatusCode >= 500)
@@ -377,10 +404,9 @@ public class Client
 
                 Logger.LogDebug("Successful request: {Url}", fileUrl);
 
-                var fileBytes = await HttpClient.GetByteArrayAsync(fileUrl, cancellationToken)
-                        .ConfigureAwait(false);
-
-                await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken)
+                using var fileStream = new FileStream(filePath, FileMode.Create);
+               
+                await res.Content.CopyToAsync(fileStream, cancellationToken)
                     .ConfigureAwait(false);
 
                 return;

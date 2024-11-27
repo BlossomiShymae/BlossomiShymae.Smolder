@@ -3,17 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlossomiShymae.Smolder", "BlossomiShymae.Smolder\BlossomiShymae.Smolder.csproj", "{DD01428A-8451-4F9C-B12F-0D781DC6FEA2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlossomiShymae.Smolder", "BlossomiShymae.Smolder\BlossomiShymae.Smolder.csproj", "{DD01428A-8451-4F9C-B12F-0D781DC6FEA2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlossomiShymae.Smolder.Tests", "BlossomiShymae.Smolder.Tests\BlossomiShymae.Smolder.Tests.csproj", "{842BAEDB-C22F-487A-8146-6884EFF16FAF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlossomiShymae.Smolder.Tests", "BlossomiShymae.Smolder.Tests\BlossomiShymae.Smolder.Tests.csproj", "{842BAEDB-C22F-487A-8146-6884EFF16FAF}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlossomiShymae.Smolder.Benchmarks", "BlossomiShymae.Smolder.Benchmarks\BlossomiShymae.Smolder.Benchmarks.csproj", "{FD87E280-A24E-4E15-B41A-164861F71639}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlossomiShymae.Smolder.Demo", "BlossomiShymae.Smolder.Demo\BlossomiShymae.Smolder.Demo.csproj", "{8011D4ED-C8BC-4C31-9B79-F013BF1D2E6B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{DD01428A-8451-4F9C-B12F-0D781DC6FEA2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -24,5 +25,19 @@ Global
 		{842BAEDB-C22F-487A-8146-6884EFF16FAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{842BAEDB-C22F-487A-8146-6884EFF16FAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{842BAEDB-C22F-487A-8146-6884EFF16FAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD87E280-A24E-4E15-B41A-164861F71639}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD87E280-A24E-4E15-B41A-164861F71639}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD87E280-A24E-4E15-B41A-164861F71639}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD87E280-A24E-4E15-B41A-164861F71639}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8011D4ED-C8BC-4C31-9B79-F013BF1D2E6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8011D4ED-C8BC-4C31-9B79-F013BF1D2E6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8011D4ED-C8BC-4C31-9B79-F013BF1D2E6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8011D4ED-C8BC-4C31-9B79-F013BF1D2E6B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9F267312-8753-4CC1-BD61-2EF47C41A483}
 	EndGlobalSection
 EndGlobal

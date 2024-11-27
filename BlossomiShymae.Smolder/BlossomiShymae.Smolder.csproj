@@ -18,7 +18,6 @@
     <Version>0.1.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Title>Smolder</Title>
-	  
   </PropertyGroup>
 
   <ItemGroup>
