@@ -1,11 +1,10 @@
-using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using BlossomiShymae.Smolder.Files;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace BlossomiShymae.Smolder;
 
@@ -21,8 +20,8 @@ public class Client
     /// <summary>
     /// The maximum amount of download tasks to concurrently run.
     /// </summary>
-    public int ConcurrentDownloadCount 
-    { 
+    public int ConcurrentDownloadCount
+    {
         get
         {
             return _concurrentDownloadCount;
@@ -104,26 +103,30 @@ public class Client
 
             Parallel.ForEach(files, file =>
             {
-                if (file.Raw.FileType == FileType.Directory)
+                switch (file.Raw.FileType)
                 {
-                    if (MaxDepth > 0)
-                    {
-                        var pathDifference = Path.Join(pointerUrl, file.Raw.EncodedName)
-                            .Replace(_url, string.Empty);
-                        var depth = pathDifference.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
-                        if (depth >= MaxDepth)
+                    case FileType.Directory:
+                        if (MaxDepth > 0)
                         {
-                            Logger.LogDebug("Skipping directory as it exceeds max depth: {Tuple}", (depth, MaxDepth, file.Raw.Name));
-                            return;
+                            var pathDifference = Path.Join(pointerUrl, file.Raw.EncodedName)
+                                .Replace(_url, string.Empty);
+                            var depth = pathDifference.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
+                            if (depth >= MaxDepth)
+                            {
+                                Logger.LogDebug("Skipping directory as it exceeds max depth: {Tuple}", (depth, MaxDepth, file.Raw.Name));
+                                return;
+                            }
                         }
-                    }
-
-                    Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, pointerUrl, file.Raw.Name));
-                    directories.Push(Path.Join(pointerUrl, file.Raw.EncodedName, "/"));
-                    return;
+                        Logger.LogDebug("Pushing directory: {Tuple}", (file.Referrer, pointerUrl, file.Raw.Name));
+                        directories.Push(Path.Join(pointerUrl, file.Raw.EncodedName, "/"));
+                        break;
+                    case FileType.File:
+                        tasks.Add(DownloadFileAsync(_url, file, cancellationToken));
+                        break;
+                    case FileType.Other:
+                        Logger.LogWarning("Skipping 'other' type, file is likely missing: {Url}", file.Url);
+                        break;
                 }
-
-                tasks.Add(DownloadFileAsync(_url, file, cancellationToken));
             });
 
             Logger.LogDebug("Directories left: {Count}", directories.Count);
@@ -219,7 +222,7 @@ public class Client
 
         var bytes = await HttpClient.GetByteArrayAsync($"https://raw.communitydragon.org/{patchVersion}/cdragon/files.exported.txt", cancellationToken)
             .ConfigureAwait(false);
-        
+
         return System.Text.Encoding.UTF8.GetString(bytes)
             .Split('\n')
             .AsParallel()
@@ -274,10 +277,19 @@ public class Client
         var contentStream = await res.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var rawFiles = await JsonSerializer.DeserializeAsync(contentStream, SourceGenerationContext.Default.RawFileArray, cancellationToken)
+        try
+        {
+            var rawFiles = await JsonSerializer.DeserializeAsync(contentStream, SourceGenerationContext.Default.RawFileArray, cancellationToken)
             .ConfigureAwait(false);
 
-        return rawFiles ?? [];
+            return rawFiles ?? [];
+        }
+        catch (JsonException ex) // "Downloading the champion game data from patch 8.18 works fine but when I try to download the same data from patch 8.19 and beyond I get this error" - .voldemort
+        {
+            Logger.LogError(ex, "Failed to deserialize JSON file: {Tuple}", url);
+            throw;
+        }
+
     }
 
     /// <summary>
@@ -294,7 +306,7 @@ public class Client
     {
         var rawFiles = await GetRawFilesAsync("https://raw.communitydragon.org/json/", cancellationToken)
             .ConfigureAwait(false);
-        
+
         return rawFiles.Where(IsPatchVersion)
             .Select(f => f.Name)
             .ToList();
@@ -323,7 +335,7 @@ public class Client
     {
         if (!exportedFile.Url.Contains(url))
             return;
-            
+
         var exportedDirectories = exportedFile.Directories.Except(directories)
             .Prepend(OutputPath)
             .ToArray();
@@ -405,7 +417,7 @@ public class Client
                 Logger.LogDebug("Successful request: {Url}", fileUrl);
 
                 using var fileStream = new FileStream(filePath, FileMode.Create);
-               
+
                 await res.Content.CopyToAsync(fileStream, cancellationToken)
                     .ConfigureAwait(false);
 
@@ -434,14 +446,16 @@ public class Client
         throw new Exception("Failed to download file");
     }
 
-    private static bool IsPatchVersion(RawFile rawFile) {
+    private static bool IsPatchVersion(RawFile rawFile)
+    {
         return rawFile.Name != "runeterra"
             && rawFile.Name != "favicon.ico"
             && rawFile.Name != "status.live.txt"
             && rawFile.Name != "status.pbe.txt";
     }
 
-    private static void ValidateUrl(string url) {
+    private static void ValidateUrl(string url)
+    {
         if (string.IsNullOrWhiteSpace(url))
             throw new ValidationException($"The URL must not be empty: {url}");
         if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
