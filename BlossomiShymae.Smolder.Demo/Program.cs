@@ -2,13 +2,17 @@
 using BlossomiShymae.Smolder;
 using Microsoft.Extensions.Logging;
 
-var client = new Client() { Logger = LoggerFactory.Create(builder =>
+var client = new Client()
 {
-    builder.SetMinimumLevel(LogLevel.Debug);
-    builder.AddSimpleConsole(options =>
+    Logger = LoggerFactory.Create(builder =>
     {
-        options.SingleLine = true;
-    });
-}).CreateLogger<Client>() };
+        builder.SetMinimumLevel(LogLevel.Debug);
+        builder.AddSimpleConsole(options =>
+        {
+            options.SingleLine = true;
+        });
+    }).CreateLogger<Client>(),
+    MaxDepth = 2,
+};
 
-await client.DownloadDirectoryAsync("https://raw.communitydragon.org/latest/game/data/images/");
+await client.DownloadDirectoryAsync("https://raw.communitydragon.org/13.9/game/data/characters/");

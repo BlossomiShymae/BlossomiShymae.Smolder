@@ -15,5 +15,9 @@ public enum FileType
     /// <summary>
     /// Contains information.
     /// </summary>
-    File
+    File,
+    /// <summary>
+    /// Unknown type. Maybe a broken symlink.
+    /// </summary>
+    Other
 }
